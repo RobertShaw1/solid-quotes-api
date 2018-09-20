@@ -47,16 +47,18 @@ const db = require('@arangodb').db;
 const aql = require('@arangodb').aql;
 const errors = require('@arangodb').errors;
 const quotesColl = db._collection('Quotes');
+const attributionColl = db._collection('Attributions');
 const DOC_NOT_FOUND = errors.ERROR_ARANGO_DOCUMENT_NOT_FOUND.code;
 
 
-router.get('/entries', function (req, res) {
+router.get('/all-quotes', function (req, res) {
   try {
-    const data = db._query('FOR q IN Quotes FOR v IN 1..2 OUTBOUND q._id GRAPH \'Wisdom\' RETURN {quote: q.text, attribution: v.name}').toArray();
-    // const data = db._query(aql`
-    //   FOR q IN ${quotesColl}
-    //   RETURN q
-    // `);
+    const data = db._query(aql`
+      FOR q IN ${quotesColl}
+        FOR a IN ${attributionColl}
+          FILTER q.attribution == a._id
+          RETURN merge(q, {attribution: {_id: a._id, name: a.name}})
+    `);
     res.send(data)
   } catch (e) {
     if (!e.isArangoError || e.errorNum !== DOC_NOT_FOUND) {
@@ -66,5 +68,5 @@ router.get('/entries', function (req, res) {
   }
 })
 .response(joi.object().required(), 'Fetched all quotes from the collection.')
-.summary('Retrieve quotes')
+.summary('Retrieve all quotes')
 .description('Retrieves all quotes and associated attributions from the respective collections.');
